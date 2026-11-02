@@ -29,7 +29,11 @@ jobs:
             cp LICENSE NOTICE.md README.md "$out/"
             (cd "$out" && tar czf "../$(basename $out).tar.gz" .)
           done
-          (cd dist && sha256sum ./*.tar.gz > SHA256SUMS.txt)
+          # The field names keep no ./ prefix: the notes tell a user to run
+          # `sha256sum -c SHA256SUMS.txt` next to the files they downloaded,
+          # whose names have no prefix, and a sum file naming ./x.tar.gz fails
+          # every line for someone holding x.tar.gz.
+          (cd dist && sha256sum ./*.tar.gz | sed 's#  \./#  #' > SHA256SUMS.txt)
         env:
           TAG: ${{ github.ref_name }}
       - name: publish
@@ -67,5 +71,18 @@ jobs:
             if (assets.length < 6) { console.error("only " + assets.length + " assets published"); process.exit(1); }
             console.log(j.tag_name + ": " + assets.map(a => a.name).join(", "));
           });'
+      # The notes tell a user "Checksums: sha256sum -c SHA256SUMS.txt". This
+      # runs that sentence as written, on the published files, holding only one
+      # asset — which is what a person who downloaded one platform's binary
+      # actually has. A sums file naming ./x.tar.gz failed exactly this.
+      - name: and the checksums verify the way the notes say they will
+        run: |
+          set -eu
+          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
+          mkdir -p verify && cd verify
+          curl -sfL -O "$base/SHA256SUMS.txt"
+          curl -sfL -O "$base/${TAG}-linux-amd64.tar.gz"
+          grep " ${TAG}-linux-amd64.tar.gz$" SHA256SUMS.txt | sha256sum -c - \
+            || { echo "::error::SHA256SUMS.txt does not verify against downloaded filenames"; exit 1; }
         env:
           TAG: ${{ github.ref_name }}
