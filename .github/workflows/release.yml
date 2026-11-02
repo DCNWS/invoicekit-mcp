@@ -33,15 +33,21 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
       - name: publish
+        # The notes go through a file, not a quoted argument: a multi-line
+        # string in a run block is exactly where YAML indentation goes wrong,
+        # and it did here.
         run: |
           set -eu
+          cat > notes.md <<'NOTES'
+          EN 16931 validation, Factur-X and ZUGFeRD auditing, and CII to UBL conversion over MCP, running entirely in-process: no invoice leaves the machine and no API key is involved.
+
+          The rule sets embedded in these binaries are the published ones; `invoicekit-mcp -version` prints their exact versions.
+
+          Engine: `github.com/dcnws/invoicekit.go` at the release named by this tag. Checksums: `sha256sum -c SHA256SUMS.txt`.
+          NOTES
           gh release create "$TAG" \
             --title "invoicekit-mcp $TAG" \
-            --notes "EN 16931 validation, Factur-X and ZUGFeRD auditing, and CII to UBL conversion over MCP, running entirely in-process: no invoice leaves the machine and no API key is involved.
-
-The rule sets embedded in these binaries are the published ones; \`invoicekit-mcp -version\` prints their exact versions.
-
-Engine: \`github.com/dcnws/invoicekit.go\` at the release named by this tag. Checksums: \`sha256sum -c SHA256SUMS.txt\`." \
+            --notes-file notes.md \
             dist/*.tar.gz dist/SHA256SUMS.txt
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

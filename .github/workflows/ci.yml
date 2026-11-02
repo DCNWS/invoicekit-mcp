@@ -18,16 +18,38 @@ jobs:
       # The server introduces itself with the engine release it links, and this
       # repository is tagged to match. That is only honest while the two are the
       # same number, so the tag is checked against go.mod rather than trusted.
-      - name: the release tag is the engine release this build links
+      - name: every workflow file in this repository is valid YAML
+        # A workflow file GitHub cannot parse produces a run with no jobs and
+        # no logs, which is the least diagnosable failure GitHub offers. One of
+        # ours did exactly that, so the parse is checked here, where a failure
+        # has a name and a line number.
         run: |
-          pinned=$(sed -n 's#^require github.com/dcnws/invoicekit.go v\(.*\)$#\1#p' go.mod)
+          set -eu
+          for f in .github/workflows/*.yml; do
+            if python3 -c 'import yaml' 2>/dev/null; then
+              python3 -c 'import sys,yaml; yaml.safe_load(open(sys.argv[1])); print("parsed " + sys.argv[1])' "$f"
+            else
+              ruby -ryaml -e 'YAML.load_file(ARGV[0]); puts "parsed " + ARGV[0]' "$f"
+            fi
+          done
+      - name: the release tag is the engine release this build links
+        # go.mod may put the requirement on one line or inside a require block,
+        # so both forms are read rather than assumed: a guard that matches
+        # neither fails every run, and a permanently red gate protects nothing.
+        run: |
+          pinned=$(awk '$1=="github.com/dcnws/invoicekit.go" {print $2}
+                        $1=="require" && $2=="github.com/dcnws/invoicekit.go" {print $3}' go.mod | head -1)
           test -n "$pinned" || { echo "::error=no engine requirement in go.mod"; exit 1; }
           tag=$(git tag --points-at HEAD --sort=-v:refname | grep -E '^v[0-9]' | head -1)
           if [ -n "$tag" ]; then
-            test "${tag#v}" = "$pinned" || {
-              echo "::error::$tag disagrees with the pinned engine v$pinned"
+            # Both sides are v-prefixed: go.mod writes v0.2.9, and so does the
+            # tag. Stripping one prefix and not the other is how this guard
+            # nearly failed every run it ever had.
+            test "$tag" = "$pinned" || {
+              echo "::error::$tag disagrees with the pinned engine $pinned"
               exit 1
             }
+            echo "$tag is the engine release this build links"
           fi
       # The Go version is read from go.mod, never written here: a pinned version
       # in a workflow silently rots.
