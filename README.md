@@ -61,7 +61,7 @@ that speaks MCP take the same command.
 
 This server has no version of its own to track: it is a transport around
 `invoicekit.go`, so a release of this repository is tagged with the engine
-release it links, and `info` reports the same number. A tag of `v0.2.7` means
+release it links, and `info` reports the same number. A tag of `v0.2.9` means
 "engine 0.2.7, nothing else", and CI fails if the tag and `go.mod` ever
 disagree. The rule-set versions inside that engine come from the publishers'
 own stamps, printed by `invoicekit-mcp -version`.
