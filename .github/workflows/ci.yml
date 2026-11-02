@@ -32,6 +32,32 @@ jobs:
               ruby -ryaml -e 'YAML.load_file(ARGV[0]); puts "parsed " + ARGV[0]' "$f"
             fi
           done
+      # Parsing is not enough: a step can be valid YAML and still never
+      # receive the variables its script expands. One of ours lost its env
+      # block to the step inserted below it and died with "TAG: unbound
+      # variable" on the release. This checks attribution, not syntax.
+      - name: every step that expands TAG actually receives it
+        run: |
+          python3 - <<'EOF'
+          import glob, sys, yaml
+          bad = []
+          for path in glob.glob(".github/workflows/*.yml"):
+              doc = yaml.safe_load(open(path))
+              for job, body in (doc.get("jobs") or {}).items():
+                  inherited = set((body.get("env") or {}).keys())
+                  for step in body.get("steps", []):
+                      env = set((step.get("env") or {}).keys()) | inherited
+                      script = step.get("run", "")
+                      # The guard mentions the variable in its own message,
+                      # so it exempts itself by name rather than by accident.
+                      if step.get("name") == "every step that expands TAG actually receives it":
+                          continue
+                      if "${TAG}" in script and "TAG" not in env:
+                          bad.append(f"{path}: job {job!r} step {step.get('name', '(unnamed)')!r} expands ${TAG} with no env")
+              for message in bad:
+                  print("::error::" + message)
+          sys.exit(1 if bad else 0)
+          EOF
       - name: the release tag is the engine release this build links
         # go.mod may put the requirement on one line or inside a require block,
         # so both forms are read rather than assumed: a guard that matches

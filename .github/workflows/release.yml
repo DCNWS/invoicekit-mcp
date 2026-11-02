@@ -71,6 +71,8 @@ jobs:
             if (assets.length < 6) { console.error("only " + assets.length + " assets published"); process.exit(1); }
             console.log(j.tag_name + ": " + assets.map(a => a.name).join(", "));
           });'
+        env:
+          TAG: ${{ github.ref_name }}
       # The notes tell a user "Checksums: sha256sum -c SHA256SUMS.txt". This
       # runs that sentence as written, on the published files, holding only one
       # asset — which is what a person who downloaded one platform's binary
