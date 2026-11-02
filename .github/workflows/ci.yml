@@ -1,0 +1,66 @@
+name: ci
+on:
+  push:
+    branches: [main]
+    # A tag is the moment the version a client reads stops being a detail, so
+    # the release itself is what CI checks.
+    tags: ['v*']
+  pull_request:
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Tags, so the step below can tell which release this commit is, if any.
+          fetch-depth: 0
+      # The server introduces itself with the engine release it links, and this
+      # repository is tagged to match. That is only honest while the two are the
+      # same number, so the tag is checked against go.mod rather than trusted.
+      - name: the release tag is the engine release this build links
+        run: |
+          pinned=$(sed -n 's#^require github.com/dcnws/invoicekit.go v\(.*\)$#\1#p' go.mod)
+          test -n "$pinned" || { echo "::error=no engine requirement in go.mod"; exit 1; }
+          tag=$(git tag --points-at HEAD --sort=-v:refname | grep -E '^v[0-9]' | head -1)
+          if [ -n "$tag" ]; then
+            test "${tag#v}" = "$pinned" || {
+              echo "::error::$tag disagrees with the pinned engine v$pinned"
+              exit 1
+            }
+          fi
+      # The Go version is read from go.mod, never written here: a pinned version
+      # in a workflow silently rots.
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      - run: go build ./...
+      - run: go test -race ./...
+      # The claim this whole project rests on, made checkable: every document
+      # this server reads is read by code whose dependency graph contains no
+      # network stack at all. Not "we promise not to call out" — there is no
+      # http client in the binary's path from a tool call to a verdict.
+      - name: the code that reads invoices has no network in its dependency graph
+        run: |
+          if go list -deps ./internal/tools | grep -E '^(net|net/http|net/url|crypto/tls)$'; then
+            echo "::error::internal/tools gained a network dependency; an invoice must not leave the machine"
+            exit 1
+          fi
+      # A server that starts and then refuses to talk protocol is the failure
+      # mode users hit first, so the handshake and the version report are run
+      # here rather than assumed.
+      - name: the server reports its engine and rule sets
+        run: |
+          go run ./cmd/invoicekit-mcp -version > out.json
+          node -e '
+          const j = require("./out.json");
+          const want = ["en16931", "xrechnung", "peppol"];
+          const have = (j.rule_sets || []).map(r => r.name);
+          for (const n of want) if (!have.includes(n)) throw new Error("rule_sets has no " + n);
+          for (const r of j.rule_sets) if (!r.version) throw new Error(r.name + " has no version");
+          if (j.offline !== true) throw new Error("offline is not true");
+          if (!/^[0-9]+\.[0-9]+\.[0-9]+$/.test(j.engine_version || "")) throw new Error("engine_version looks wrong: " + j.engine_version);
+          console.log("engine " + j.engine_version + " · " + j.rule_sets.map(r => r.name + " " + r.version).join(", "));
+          '

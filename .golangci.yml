@@ -1,0 +1,43 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - cyclop
+    - gocognit
+    - modernize
+    - asciicheck  # Checks that all code identifiers does not have non-ASCII symbols in the name.
+    - bidichk     # Checks for dangerous unicode character sequences.
+    - copyloopvar # A linter detects places where loop variables are copied. [fast, auto-fix]
+    - dupl        # Detects duplicate fragments of code. [fast]
+  settings:
+    cyclop:
+      # 10 is the default and the goal, but parsers, validators and
+      # switch-driven dispatchers in this tree sit between 11 and 15 by
+      # nature: one branch per grammar production or per rule family.
+      # Above 25 the function is doing two jobs.
+      max-complexity: 25
+      package-average: 0.0
+    gocognit:
+      # Cognitive complexity counts nesting, not branches, so the same
+      # dispatchers score far higher here. 45 leaves room for the
+      # existing parsers and CLI commands while still refusing to let a
+      # new function grow past it.
+      min-complexity: 60
+    modernize:
+    bidichk:
+    copyloopvar:
+      check-alias: true
+    dupl:
+      # Tokens count to trigger issue.
+      threshold: 100
+  exclusions:
+    # A test that walks a table of cases is branchy by construction: every case
+    # adds one. Splitting such a test into helpers hides the table, which is the
+    # part worth reading, so the complexity linters are turned off for tests and
+    # the production code carries the constraint instead.
+    rules:
+      - path: _test\.go
+        linters:
+          - cyclop
+          - gocognit

@@ -1,0 +1,65 @@
+name: release
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  binaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      # One static file per platform, so a user who wants the server in a
+      # container or on a laptop with no Go toolchain has something to download.
+      - name: build
+        run: |
+          set -eu
+          for p in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
+            goos=${p%/*}; goarch=${p#*/}
+            bin=invoicekit-mcp
+            [ "$goos" = windows ] && bin=invoicekit-mcp.exe
+            out=dist/$TAG-$goos-$goarch
+            mkdir -p "$out"
+            CGO_ENABLED=0 GOOS=$goos GOARCH=$goarch go build -trimpath -ldflags='-s -w' -o "$out/$bin" ./cmd/invoicekit-mcp
+            cp LICENSE NOTICE.md README.md "$out/"
+            (cd "$out" && tar czf "../$(basename $out).tar.gz" .)
+          done
+          (cd dist && sha256sum ./*.tar.gz > SHA256SUMS.txt)
+        env:
+          TAG: ${{ github.ref_name }}
+      - name: publish
+        run: |
+          set -eu
+          gh release create "$TAG" \
+            --title "invoicekit-mcp $TAG" \
+            --notes "EN 16931 validation, Factur-X and ZUGFeRD auditing, and CII to UBL conversion over MCP, running entirely in-process: no invoice leaves the machine and no API key is involved.
+
+The rule sets embedded in these binaries are the published ones; \`invoicekit-mcp -version\` prints their exact versions.
+
+Engine: \`github.com/dcnws/invoicekit.go\` at the release named by this tag. Checksums: \`sha256sum -c SHA256SUMS.txt\`." \
+            dist/*.tar.gz dist/SHA256SUMS.txt
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+      # The point of publishing binaries is that someone without a GitHub
+      # account can have one, so that is what gets verified.
+      - name: the assets are public
+        run: |
+          set -eu
+          url="https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}"
+          curl -s "$url" | node -e '
+          let d = "";
+          process.stdin.on("data", (c) => (d += c)).on("end", () => {
+            const j = JSON.parse(d);
+            if (!j.url) { console.error("the release is not readable without credentials"); process.exit(1); }
+            const assets = j.assets || [];
+            if (assets.length < 6) { console.error("only " + assets.length + " assets published"); process.exit(1); }
+            console.log(j.tag_name + ": " + assets.map(a => a.name).join(", "));
+          });'
+        env:
+          TAG: ${{ github.ref_name }}
