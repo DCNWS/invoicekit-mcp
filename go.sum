@@ -1,5 +1,5 @@
-github.com/dcnws/invoicekit.go v0.2.11 h1:K3FqsHHwKWlKYhubI9vU0H/NcAT44Ykpx3MwTPNaw70=
-github.com/dcnws/invoicekit.go v0.2.11/go.mod h1:w53zVlXBdVVWweHtzEn6JFgYE/y25vQeGvxfbhSWAlI=
+github.com/dcnws/invoicekit.go v0.2.13 h1:eVy4w5YxfkjrIowJa1/5VNr+pHW015lAuc2DB4HYT6c=
+github.com/dcnws/invoicekit.go v0.2.13/go.mod h1:w53zVlXBdVVWweHtzEn6JFgYE/y25vQeGvxfbhSWAlI=
 github.com/golang-jwt/jwt/v5 v5.3.1 h1:kYf81DTWFe7t+1VvL7eS+jKFVWaUnK9cB1qbwn63YCY=
 github.com/golang-jwt/jwt/v5 v5.3.1/go.mod h1:fxCRLWMO43lRc8nhHWY6LGqRcf+1gQWArsqaEUEa5bE=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=

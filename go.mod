@@ -3,7 +3,7 @@ module github.com/dcnws/invoicekit-mcp
 go 1.27
 
 require (
-	github.com/dcnws/invoicekit.go v0.2.11
+	github.com/dcnws/invoicekit.go v0.2.13
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 )
 
